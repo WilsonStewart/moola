@@ -18,6 +18,14 @@ type MoolaDatabase struct {
 	mu             sync.RWMutex
 }
 
+func NewMoolaDatabase() (*MoolaDatabase, error) {
+	var newDb MoolaDatabase
+
+	newDb.Accounts = make(map[string]*Account)
+
+	return ddnewDb, nil
+}
+
 func (mdb *MoolaDatabase) GetAccount(name string) (*Account, error) {
 	mdb.mu.RLock()
 	defer mdb.mu.RUnlock()
