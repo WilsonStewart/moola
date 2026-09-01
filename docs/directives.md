@@ -16,4 +16,17 @@
 - setyear
 - setmonth
 - setday
-- assert  
+- assert
+- goal
+- resetgoal
+- period
+- periodadvance
+- 
+ 
+- 
+## PERIOD
+
+period pay_period - month 6 advance
+period pay_period - manual
+
+
