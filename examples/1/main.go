@@ -7,7 +7,10 @@ import (
 )
 
 func main() {
-	err := processor.ProcessMoolaFile("master.moola", true)
+
+	p := processor.NewProcessor()
+
+	err := p.ProcessMoolaFile("master.moola", true)
 	if err != nil {
 		log.Fatal(err)
 	}
