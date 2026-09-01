@@ -6,49 +6,40 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
+	"charm.land/lipgloss/v2"
 	"github.com/WilsonStewart/moola/internal/core"
 )
 
-type Processor struct {
-	database     *core.MoolaDatabase
-	currentYear  int
-	currentMonth time.Month
-	currentDay   int
-}
-
-type MoolaFile [][]string
-
-func NewProcessor() *Processor {
+func NewProcessor(moolaInstance *core.MoolaInstance) *Processor {
 	return &Processor{
-		database: core.NewMoolaDatabase(),
+		mi: moolaInstance,
 	}
 }
 
-func readMoolaFile(path string) (MoolaFile, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
+// func readMoolaFile(path string) (MoolaFile, error) {
+// 	file, err := os.Open(path)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	defer file.Close()
 
-	var result MoolaFile
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		words := strings.Fields(scanner.Text())
+// 	var result MoolaFile
+// 	scanner := bufio.NewScanner(file)
+// 	for scanner.Scan() {
+// 		words := strings.Fields(scanner.Text())
 
-		if len(words) > 0 {
-			result = append(result, words)
-		}
-	}
+// 		if len(words) > 0 {
+// 			result = append(result, words)
+// 		}
+// 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
+// 	if err := scanner.Err(); err != nil {
+// 		return nil, err
+// 	}
 
-	return result, nil
-}
+// 	return result, nil
+// }
 
 func (p *Processor) ProcessMoolaFile(path string, isMasterFile bool) error {
 	file, err := os.Open(path)
@@ -71,27 +62,42 @@ func (p *Processor) ProcessMoolaFile(path string, isMasterFile bool) error {
 		return err
 	}
 
-	for _, line := range mf {
-		directive := strings.ToUpper(line[0])
-		switch directive {
+	for idx, line := range mf {
+		if len(line) == 0 {
+			continue
+		}
+
+		if len(line) == 1 {
+			return fmt.Errorf("this line is too short. must have at least one argument: %s", strings.Join(line, ","))
+		}
+
+		mfl := MoolaFileLine{
+			directive:  strings.ToUpper(line[0]),
+			arguments:  line[1:],
+			lineNumber: idx,
+			filename:   path,
+		}
+		switch mfl.directive {
 		case "OPENACCOUNT":
-			if err := p.OPENACCOUNT(line); err != nil {
+			if err := p.OPENACCOUNT(mfl); err != nil {
 				return err
 			}
 		case "ASSERT":
-			if err := p.ASSERT(line); err != nil {
+			if err := p.ASSERT(mfl); err != nil {
 				return err
 			}
 		case "TRANSACT":
-			if err := p.TRANSACT(line); err != nil {
+			if err := p.TRANSACT(mfl); err != nil {
 				return err
 			}
 		default:
-			return fmt.Errorf("%q is not a known directive!", directive)
+			return fmt.Errorf("%q is not a known directive!", mfl.directive)
 		}
 	}
 
-	b, _ := json.MarshalIndent(p.database, "", "  ")
+	b, _ := json.MarshalIndent(p.mi, "", "  ")
 	fmt.Println(string(b))
+
+	lipgloss.Println(p.mi.RenderCategorizedTables())
 	return nil
 }
