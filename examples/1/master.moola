@@ -1,1 +1,5 @@
-openaccount cash uniwyo_checking_spending uws
+openaccount cash wells_fargo_checking wfc
+aliasdirective openaccount oa
+aliasdirective transact tt
+oa cash chase_checking chase
+assert wfc 100

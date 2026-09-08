@@ -5,24 +5,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 )
 
 type SymbolsStore struct {
-	AccountNames      []string
-	AccountAliasNames []string
+	DirectiveNames      []string
+	DirectiveAliasNames []string
+	AccountNames        []string
+	AccountAliasNames   []string
 }
 
 type Datafile struct {
-	Accounts       map[string]*Account
-	AccountAliases map[string]string
+	DirectiveAliases map[string]string
+	Accounts         map[string]*Account
+	AccountAliases   map[string]string
 }
 
 func NewDatafile() *Datafile {
 	datafile := &Datafile{
-		Accounts:       make(map[string]*Account),
-		AccountAliases: make(map[string]string),
+		DirectiveAliases: make(map[string]string),
+		Accounts:         make(map[string]*Account),
+		AccountAliases:   make(map[string]string),
 	}
 
 	return datafile
@@ -38,6 +43,10 @@ type Processor struct {
 func NewProcessor() *Processor {
 	processor := &Processor{
 		Datafile: *NewDatafile(),
+	}
+
+	for _, directiveName := range builtinDirectiveNames {
+		processor.Symbols.DirectiveNames = append(processor.Symbols.DirectiveNames, directiveName)
 	}
 
 	processor.defaultEnvelopeAccountName = "to_be_assigned"
@@ -97,7 +106,18 @@ func (p *Processor) ReadAndProcessFile(path string) error {
 	}
 
 	for _, line := range lines {
-		switch strings.ToLower(line[0]) {
+		directive := strings.ToLower(line[0])
+
+		if slices.Contains(p.Symbols.DirectiveAliasNames, directive) {
+			directive = p.Datafile.DirectiveAliases[directive]
+			line[0] = directive
+		}
+
+		if !slices.Contains(p.Symbols.DirectiveNames, directive) {
+			return fmt.Errorf("unknown directive: %q is not a known directive or directive alias", directive)
+		}
+
+		switch directive {
 		case "openaccount":
 			node := OpenAccountNode{}
 			if err := node.Unmarshal(line); err != nil {
@@ -105,6 +125,26 @@ func (p *Processor) ReadAndProcessFile(path string) error {
 			}
 
 			if err := p.OpenAccount(node); err != nil {
+				return err
+			}
+
+		case "aliasdirective":
+			node := AliasDirectiveNode{}
+			if err := node.Unmarshal(line); err != nil {
+				return err
+			}
+
+			if err := p.AliasDirective(node); err != nil {
+				return err
+			}
+
+		case "assert":
+			node := AssertNode{}
+			if err := node.Unmarshal(line); err != nil {
+				return err
+			}
+
+			if err := p.Assert(node); err != nil {
 				return err
 			}
 		}
