@@ -147,6 +147,16 @@ func (p *Processor) ReadAndProcessFile(path string) error {
 			if err := p.Assert(node); err != nil {
 				return err
 			}
+
+		case "transact":
+			node := TransactNode{}
+			if err := node.Unmarshal(line); err != nil {
+				return err
+			}
+
+			if err := p.Transact(node); err != nil {
+				return err
+			}
 		}
 	}
 

@@ -44,8 +44,8 @@ func (p *Processor) Assert(node AssertNode) error {
 
 	balanceDelta := node.Balance - account.Balance
 
-	account.Balance += balanceDelta                // TODO: Change to transact
-	defaultEnvelopeAccount.Balance += balanceDelta // TODO: Change to transact
+	account.Balance += balanceDelta
+	defaultEnvelopeAccount.Balance += balanceDelta
 
 	return nil
 }

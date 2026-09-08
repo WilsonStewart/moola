@@ -1,6 +1,9 @@
 package processor
 
-import "strconv"
+import (
+	"fmt"
+	"strconv"
+)
 
 type TransactNode struct {
 	BalanceDelta        float64
@@ -33,5 +36,26 @@ func (n *TransactNode) Unmarshal(rawFields []string) error {
 }
 
 func (p *Processor) Transact(node TransactNode) error {
+	cashAccount, err := p.getAccount(node.CashAccountName)
+	if err != nil {
+		return err
+	}
+
+	envelopeAccount, err := p.getAccount(node.EnvelopeAccountName)
+	if err != nil {
+		return err
+	}
+
+	if cashAccount.Kind != "cash" {
+		return fmt.Errorf("account-kind-mismatch: %s account provided, but cash required", cashAccount.Kind)
+	}
+
+	if envelopeAccount.Kind != "envelope" {
+		return fmt.Errorf("account-kind-mismatch: %s account provided, but envelope required", envelopeAccount.Kind)
+	}
+
+	cashAccount.Balance += node.BalanceDelta
+	envelopeAccount.Balance += node.BalanceDelta
+
 	return nil
 }
