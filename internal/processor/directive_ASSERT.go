@@ -1,32 +1,29 @@
 package processor
 
-import (
-	"errors"
-	"fmt"
-	"strconv"
-	"strings"
-)
+import "strconv"
 
-func (p *Processor) ASSERT(line MoolaFileLine) error {
-	if line.directive != "ASSERT" {
-		return fmt.Errorf("tried to format a '%q' directive with the ASSERT method for some reason", strings.ToUpper(line.directive))
+type AssertNode struct {
+	AccountName string
+	Balance     float64
+}
+
+func (node *AssertNode) Unmarshal(rawFields []string) error {
+	if err := VerifyExpectedDirectiveAndFieldRange(rawFields, "assert", 3, 3); err != nil {
+		return err
 	}
 
-	if len(line.arguments) != 2 {
-		return errors.New("2 arguments are required for the ASSERT directive: ASSERT accountName balance")
-	}
+	node.AccountName = rawFields[1]
 
-	account, err := p.mi.GetAccount(line.arguments[0])
+	parsedBalance, err := strconv.ParseFloat(rawFields[2], 64)
 	if err != nil {
-		return fmt.Errorf("could not find account: %w", err)
+		return err
 	}
+	node.Balance = parsedBalance
 
-	newBalance, err := strconv.Atoi(line.arguments[1])
-	if err != nil {
-		return fmt.Errorf("could not convert %s to a balance int: %w", line.arguments[1], err)
-	}
+	return nil
+}
 
-	account.Balance = newBalance
+func (p *Processor) Assert(node AssertNode) error {
 
 	return nil
 }

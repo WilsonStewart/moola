@@ -3,15 +3,13 @@ package main
 import (
 	"log"
 
-	"github.com/WilsonStewart/moola/internal/core"
 	"github.com/WilsonStewart/moola/internal/processor"
 )
 
 func main() {
-	mi := core.NewMoolaInstance()
-	p := processor.NewProcessor(mi)
+	p := processor.NewProcessor()
 
-	err := p.ProcessMoolaFile("master.moola", true)
+	err := p.ReadAndProcessFile("master.moola")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -1,4 +1,1 @@
-openaccount uniwyo_checking_spending uws cash
-openaccount to_be_assigned tba envelope
-openaccount gas - envelope
-transact starting_balance 4100 uniwyo_checking_spending to_be_assigned
+openaccount cash uniwyo_checking_spending uws
