@@ -1,0 +1,9 @@
+package serve
+
+import "github.com/WilsonStewart/moola/internal/processor"
+
+templ Hello(datafile processor.Datafile) {
+	for _, account := range datafile.Accounts {
+		<p>{ account.Name }</p>
+	}
+}

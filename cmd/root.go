@@ -5,9 +5,11 @@ package cmd
 
 import (
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/WilsonStewart/moola/internal/processor"
+	"github.com/WilsonStewart/moola/internal/serve"
 	"github.com/spf13/cobra"
 )
 
@@ -22,6 +24,17 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+			err := serve.Hello(p.Datafile).Render(r.Context(), w)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+		})
+
+		http.ListenAndServe(":8080", nil)
 	},
 }
 
