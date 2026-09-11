@@ -26,20 +26,20 @@ func (node *AssertNode) Unmarshal(rawFields []string) error {
 	return nil
 }
 
-func (p *Processor) Assert(node AssertNode) error {
+func (d *Datafile) Assert(node AssertNode) error {
 	// Replace the alias name if it's there
-	if realCashAccountName, ok := p.Datafile.AccountAliases[node.CashAccountName]; ok {
+	if realCashAccountName, ok := d.AccountAliases[node.CashAccountName]; ok {
 		node.CashAccountName = realCashAccountName
 	}
 
-	account, ok := p.Datafile.Accounts[node.CashAccountName]
+	account, ok := d.Accounts[node.CashAccountName]
 	if !ok {
 		return fmt.Errorf("account-not-found: %q not found", node.CashAccountName)
 	}
 
-	defaultEnvelopeAccount, ok := p.Datafile.Accounts[p.defaultEnvelopeAccountName]
+	defaultEnvelopeAccount, ok := d.Accounts[d.defaultEnvelopeAccountName]
 	if !ok {
-		return fmt.Errorf("account-not-found: %q not found", p.defaultEnvelopeAccountName)
+		return fmt.Errorf("account-not-found: %q not found", d.defaultEnvelopeAccountName)
 	}
 
 	balanceDelta := node.Balance - account.Balance

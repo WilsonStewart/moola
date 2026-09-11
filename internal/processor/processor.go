@@ -2,13 +2,32 @@ package processor
 
 import (
 	"bufio"
-	"encoding/json"
+	"context"
 	"fmt"
+	"log/slog"
+	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 )
+
+type Processor struct {
+	Datafile   *Datafile
+	Mu         sync.RWMutex
+	sseMu      sync.Mutex
+	sseClients map[chan string]struct{}
+}
+
+type Datafile struct {
+	DirectiveAliases           map[string]string
+	Accounts                   map[string]*Account
+	AccountAliases             map[string]string
+	Symbols                    SymbolsStore
+	defaultEnvelopeAccountName string
+}
 
 type SymbolsStore struct {
 	DirectiveNames      []string
@@ -17,10 +36,13 @@ type SymbolsStore struct {
 	AccountAliasNames   []string
 }
 
-type Datafile struct {
-	DirectiveAliases map[string]string
-	Accounts         map[string]*Account
-	AccountAliases   map[string]string
+func NewProcessor() *Processor {
+	processor := &Processor{
+		Datafile:   NewDatafile(),
+		sseClients: make(map[chan string]struct{}),
+	}
+
+	return processor
 }
 
 func NewDatafile() *Datafile {
@@ -30,36 +52,21 @@ func NewDatafile() *Datafile {
 		AccountAliases:   make(map[string]string),
 	}
 
-	return datafile
-}
-
-type Processor struct {
-	Datafile                   Datafile
-	Symbols                    SymbolsStore
-	currentDate                time.Time
-	defaultEnvelopeAccountName string
-}
-
-func NewProcessor() *Processor {
-	processor := &Processor{
-		Datafile: *NewDatafile(),
-	}
-
 	for _, directiveName := range builtinDirectiveNames {
-		processor.Symbols.DirectiveNames = append(processor.Symbols.DirectiveNames, directiveName)
+		datafile.Symbols.DirectiveNames = append(datafile.Symbols.DirectiveNames, directiveName)
 	}
 
-	processor.defaultEnvelopeAccountName = "to_be_assigned"
+	datafile.defaultEnvelopeAccountName = "to_be_assigned"
 
 	defaultEnvelopeAccountAliasName := "tba"
 
-	processor.OpenAccount(OpenAccountNode{
+	datafile.OpenAccount(OpenAccountNode{
 		accountKind:           "envelope",
 		requestedAccountName:  "to_be_assigned",
 		requestedAccountAlias: &defaultEnvelopeAccountAliasName,
 	})
 
-	return processor
+	return datafile
 }
 
 func VerifyExpectedDirectiveAndFieldRange(
@@ -81,7 +88,52 @@ func VerifyExpectedDirectiveAndFieldRange(
 	return nil
 }
 
-func (p *Processor) ReadAndProcessFile(path string) error {
+func (p *Processor) ProcessEvery1Second(ctx context.Context) {
+
+	ticker := time.NewTicker(1 * time.Second)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			p.ReadAndProcessMasterMoo("master.moo")
+			fmt.Println(p.Datafile)
+		}
+	}
+}
+
+func (p *Processor) ProcessMooFileChanges() {
+	lastCheck := time.Now()
+
+	for range time.Tick(300 * time.Millisecond) {
+		entries, _ := os.ReadDir(".")
+		triggered := false
+
+		for _, e := range entries {
+			if filepath.Ext(e.Name()) == ".moo" {
+				info, err := e.Info()
+				if err == nil && info.ModTime().After(lastCheck) {
+					triggered = true
+					break
+				}
+			}
+		}
+
+		if triggered {
+			if err := p.ReadAndProcessMasterMoo("master.moo"); err != nil {
+				fmt.Println(err)
+			}
+			lastCheck = time.Now()
+		}
+	}
+}
+
+func (p *Processor) ReadAndProcessMasterMoo(path string) error {
+	slog.Info("Processing master.moo...")
+
+	ndf := NewDatafile()
+
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -108,12 +160,12 @@ func (p *Processor) ReadAndProcessFile(path string) error {
 	for _, line := range lines {
 		directive := strings.ToLower(line[0])
 
-		if slices.Contains(p.Symbols.DirectiveAliasNames, directive) {
-			directive = p.Datafile.DirectiveAliases[directive]
+		if slices.Contains(ndf.Symbols.DirectiveAliasNames, directive) {
+			directive = ndf.DirectiveAliases[directive]
 			line[0] = directive
 		}
 
-		if !slices.Contains(p.Symbols.DirectiveNames, directive) {
+		if !slices.Contains(ndf.Symbols.DirectiveNames, directive) {
 			return fmt.Errorf("unknown directive: %q is not a known directive or directive alias", directive)
 		}
 
@@ -124,7 +176,7 @@ func (p *Processor) ReadAndProcessFile(path string) error {
 				return err
 			}
 
-			if err := p.OpenAccount(node); err != nil {
+			if err := ndf.OpenAccount(node); err != nil {
 				return err
 			}
 
@@ -134,7 +186,7 @@ func (p *Processor) ReadAndProcessFile(path string) error {
 				return err
 			}
 
-			if err := p.AliasDirective(node); err != nil {
+			if err := ndf.AliasDirective(node); err != nil {
 				return err
 			}
 
@@ -144,7 +196,7 @@ func (p *Processor) ReadAndProcessFile(path string) error {
 				return err
 			}
 
-			if err := p.Assert(node); err != nil {
+			if err := ndf.Assert(node); err != nil {
 				return err
 			}
 
@@ -154,23 +206,85 @@ func (p *Processor) ReadAndProcessFile(path string) error {
 				return err
 			}
 
-			if err := p.Transact(node); err != nil {
+			if err := ndf.Transact(node); err != nil {
+				return err
+			}
+
+		case "move":
+			node := MoveNode{}
+			if err := node.Unmarshal(line); err != nil {
+				return err
+			}
+
+			if err := ndf.Move(node); err != nil {
 				return err
 			}
 		}
 	}
 
-	datafile, err := json.MarshalIndent(p.Datafile, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-	symbols, err := json.MarshalIndent(p.Symbols, "", "  ")
-	if err != nil {
-		panic(err)
-	}
+	// datafile, err := json.MarshalIndent(ndf, "", "  ")
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// symbols, err := json.MarshalIndent(p.Symbols, "", "  ")
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	fmt.Println(string(datafile))
-	fmt.Println(string(symbols))
+	// fmt.Println(string(datafile))
+	// fmt.Println(string(symbols))
+
+	p.Mu.Lock()
+	p.Datafile = ndf
+	p.Mu.Unlock()
+
+	p.refreshSSEClients()
 
 	return nil
+}
+
+func (p *Processor) refreshSSEClients() {
+	p.sseMu.Lock()
+	defer p.sseMu.Unlock()
+	for ch := range p.sseClients {
+		select {
+		case ch <- "refresh":
+		default:
+		}
+	}
+}
+
+func (p *Processor) SSEEventsEndpointHandler(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	ch := make(chan string, 1)
+
+	p.sseMu.Lock()
+	p.sseClients[ch] = struct{}{}
+	p.sseMu.Unlock()
+
+	defer func() {
+		p.sseMu.Lock()
+		delete(p.sseClients, ch)
+		p.sseMu.Unlock()
+		close(ch)
+	}()
+
+	for {
+		select {
+		case msg := <-ch:
+			fmt.Fprintf(w, "data: %s\n\n", msg)
+			flusher.Flush()
+		case <-r.Context().Done():
+			return
+		}
+	}
 }

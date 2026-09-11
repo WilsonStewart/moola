@@ -9,7 +9,7 @@ import (
 func main() {
 	p := processor.NewProcessor()
 
-	err := p.ReadAndProcessFile("master.moola")
+	err := p.ReadAndProcessMasterMoo("master.moola")
 	if err != nil {
 		log.Fatal(err)
 	}

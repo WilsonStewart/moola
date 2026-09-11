@@ -21,21 +21,21 @@ func (n *AliasDirectiveNode) Unmarshal(rawFields []string) error {
 	return nil
 }
 
-func (p *Processor) AliasDirective(node AliasDirectiveNode) error {
-	if slices.Contains(p.Symbols.DirectiveAliasNames, node.AliasName) {
+func (d *Datafile) AliasDirective(node AliasDirectiveNode) error {
+	if slices.Contains(d.Symbols.DirectiveAliasNames, node.AliasName) {
 		return fmt.Errorf("duplicate alias: %q directive alias already exists", node.AliasName)
 	}
 
-	if slices.Contains(p.Symbols.DirectiveNames, node.AliasName) {
+	if slices.Contains(d.Symbols.DirectiveNames, node.AliasName) {
 		return fmt.Errorf("invalid alias name: %q is already a directive, cannot make an alias with that name", node.AliasName)
 	}
 
-	if !slices.Contains(p.Symbols.DirectiveNames, node.DirectiveName) {
+	if !slices.Contains(d.Symbols.DirectiveNames, node.DirectiveName) {
 		return fmt.Errorf("invalid directive name: %q is not a known directive", node.DirectiveName)
 	}
 
-	p.Datafile.DirectiveAliases[node.AliasName] = node.DirectiveName
-	p.Symbols.DirectiveAliasNames = append(p.Symbols.DirectiveAliasNames, node.AliasName)
+	d.DirectiveAliases[node.AliasName] = node.DirectiveName
+	d.Symbols.DirectiveAliasNames = append(d.Symbols.DirectiveAliasNames, node.AliasName)
 
 	return nil
 }

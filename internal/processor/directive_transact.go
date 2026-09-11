@@ -35,13 +35,13 @@ func (n *TransactNode) Unmarshal(rawFields []string) error {
 	return nil
 }
 
-func (p *Processor) Transact(node TransactNode) error {
-	cashAccount, err := p.getAccount(node.CashAccountName)
+func (d *Datafile) Transact(node TransactNode) error {
+	cashAccount, err := d.getAccount(node.CashAccountName)
 	if err != nil {
 		return err
 	}
 
-	envelopeAccount, err := p.getAccount(node.EnvelopeAccountName)
+	envelopeAccount, err := d.getAccount(node.EnvelopeAccountName)
 	if err != nil {
 		return err
 	}

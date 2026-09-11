@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 
 	"github.com/WilsonStewart/moola/internal/processor"
 	"github.com/WilsonStewart/moola/internal/serve"
@@ -18,16 +19,22 @@ var rootCmd = &cobra.Command{
 	Short: "A brief description of your application",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
+		var wg sync.WaitGroup
 		p := processor.NewProcessor()
+		wg.Go(func() { p.ProcessMooFileChanges() })
 
-		err := p.ReadAndProcessFile("master.moola")
+		err := p.ReadAndProcessMasterMoo("master.moo")
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		http.HandleFunc("/events", p.SSEEventsEndpointHandler)
 
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			p.Mu.RLock()
+			defer p.Mu.RUnlock()
+
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			err := serve.Hello(p.Datafile).Render(r.Context(), w)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -35,6 +42,8 @@ var rootCmd = &cobra.Command{
 		})
 
 		http.ListenAndServe(":8080", nil)
+
+		wg.Wait()
 	},
 }
 

@@ -16,14 +16,14 @@ var validAccountKinds = []string{
 	"envelope",
 }
 
-func (p *Processor) getAccount(name string) (*Account, error) {
-	if slices.Contains(p.Symbols.AccountAliasNames, name) {
-		name = p.Datafile.AccountAliases[name]
+func (d *Datafile) getAccount(name string) (*Account, error) {
+	if slices.Contains(d.Symbols.AccountAliasNames, name) {
+		name = d.AccountAliases[name]
 	}
 
-	if !slices.Contains(p.Symbols.AccountNames, name) {
+	if !slices.Contains(d.Symbols.AccountNames, name) {
 		return nil, fmt.Errorf("could not find account with name %q", name)
 	}
 
-	return p.Datafile.Accounts[name], nil
+	return d.Accounts[name], nil
 }

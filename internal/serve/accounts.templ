@@ -1,9 +1,47 @@
 package serve
 
 import "github.com/WilsonStewart/moola/internal/processor"
+import "github.com/WilsonStewart/moola/internal/util"
 
-templ Hello(datafile processor.Datafile) {
-	for _, account := range datafile.Accounts {
-		<p>{ account.Name }</p>
-	}
+templ Hello(datafile *processor.Datafile) {
+	<script>
+	const eventSource = new EventSource("/events");
+
+	eventSource.onmessage = (event) => {
+		if (event.data === "refresh") {
+			window.location.reload();
+		}
+	};
+</script>
+	<h1>Envelopes</h1>
+	<table>
+		<tbody>
+			<tr>
+				<td>to_be_assigned</td>
+				<td>{ datafile.Accounts["to_be_assigned"].Balance }</td>
+			</tr>
+			for _, key := range util.SortMapStringKeys(datafile.Accounts) {
+				if datafile.Accounts[key].Kind == "envelope" && datafile.Accounts[key].Name != "to_be_assigned" {
+					<tr>
+						<td>{ datafile.Accounts[key].Name }</td>
+						<td>{ datafile.Accounts[key].Balance }</td>
+					</tr>
+				}
+			}
+		</tbody>
+	</table>
+	<hr/>
+	<h1>Cash</h1>
+	<table>
+		<tbody>
+			for _, key := range util.SortMapStringKeys(datafile.Accounts) {
+				if datafile.Accounts[key].Kind == "cash" {
+					<tr>
+						<td>{ datafile.Accounts[key].Name }</td>
+						<td>{ datafile.Accounts[key].Balance }</td>
+					</tr>
+				}
+			}
+		</tbody>
+	</table>
 }

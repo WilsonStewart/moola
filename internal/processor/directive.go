@@ -5,4 +5,5 @@ var builtinDirectiveNames = []string{
 	"assert",
 	"openaccount",
 	"transact",
+	"move",
 }
